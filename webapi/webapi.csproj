@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="trim.xml" />
+  </ItemGroup>
+
+  <!-- enable aggressive trimming. -->
+  <Target Name="SetAggresiveILLinkDefaults"
+          AfterTargets="_SetILLinkDefaults">
+    <ItemGroup>
+      <TrimmerRootAssembly Remove="@(TrimmerRootAssembly)" />
+      <TrimmerRootAssembly Include="@(IntermediateAssembly)" />
+      <_ManagedAssembliesToLink Update="@(_ManagedAssembliesToLink)">
+        <action>link</action>
+      </_ManagedAssembliesToLink>
+    </ItemGroup>
+
+    <!-- if NoTrim is true, pass through cecil to remove R2R, but don't trim. -->
+    <ItemGroup Condition="'$(NoTrim)' == 'true'">
+      <TrimmerRootAssembly Include="@(_ManagedAssembliesToLink)" />
+    </ItemGroup>
+  </Target>
+
+
+  <Target Name="RemoveUnnecessaryFilesFromPublishOutput"
+          AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordaccore'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordbi'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libdbgshim'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'SOS_README'" />
+
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(Extension)' == '.a'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(Extension)' == '.pdb'" />
+
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)%(Extension)' == 'appsettings.Development.json'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)%(Extension)' == 'nuget.config'" />
+
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.IO.Compression.Native'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Security.Cryptography.Native.OpenSsl'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Net.Security.Native'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Net.Http.Native'" />
+
+
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Private.Xml'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Private.Xml.Linq'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Data.Common'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'Microsoft.CSharp'" />
+
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.IO.Compression'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Private.DataContractSerialization'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Reflection.Metadata'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Text.RegularExpressions'" />
+    </ItemGroup>
+
+    <Message Importance="High" Text="not publishing: %(PublishFilterList.Identity)" />
+
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(PublishFilterList)" />
+      <!-- these should be removed from deps file. -->
+      <!-- to accomplish that, remove them from runtimecopylocalitems, etc. as well. -->
+      <ResolvedCompileFileDefinitions Remove="@(PublishFilterList)" />
+      <NativeCopyLocalItems Remove="@(PublishFilterList)" />
+      <ResourceCopyLocalItems Remove="@(PublishFilterList)" />
+      <RuntimeCopyLocalItems Remove="@(PublishFilterList)" />
+      <RuntimeTargetsCopyLocalItems Remove="@(PublishFilterList)" />
+      <RuntimePackAsset Remove="@(PublishFilterList)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
