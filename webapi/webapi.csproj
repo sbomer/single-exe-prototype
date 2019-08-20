@@ -2,6 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>true</PublishTrimmed>
+    <PublishDir Condition=" '$(PublishTrimmed)' == 'true' ">obj/trim</PublishDir>
+  </PropertyGroup>
+
+  <!-- detect current platform RID -->
+  <PropertyGroup Condition=" '$(SelfContained)' == 'true' ">
+    <RuntimeIdentifier Condition="'$([MSBuild]::IsOSPlatform(Windows))' == 'true'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$([MSBuild]::IsOSPlatform(Linux))' == 'true'">linux-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$([MSBuild]::IsOSPlatform(OSX))' == 'true'">osx-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
