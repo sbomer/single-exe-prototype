@@ -42,6 +42,7 @@
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordaccore'" />
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordbi'" />
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libdbgshim'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libcoreclrtraceptprovider'" />
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'SOS_README'" />
 
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(Extension)' == '.a'" />

@@ -90,7 +90,7 @@
     </type>
   </assembly>
 
-  <assembly fullname="Microsoft.AspNetCore.Http">
+  <assembly fullname="Microsoft.AspNetCore.Hosting">
     <type fullname="Microsoft.AspNetCore.Http.DefaultHttpContextFactory">
       <method name=".ctor" />
     </type>
@@ -134,10 +134,6 @@
     <type fullname="Microsoft.AspNetCore.Routing.Matching.DfaMatcherFactory">
       <method name=".ctor" />
     </type>
-  </assembly>
-
-  <!-- this assembly load failure shows up when I keep everything in webapi.Startup.-->
-  <assembly fullname="Microsoft.AspNetCore.Mvc.Components.Prerendering">
   </assembly>
 
   <assembly fullname="Microsoft.AspNetCore.Mvc.Core">
@@ -268,6 +264,9 @@
       <method name=".ctor" />
     </type>
     <type fullname="Microsoft.AspNetCore.Mvc.Infrastructure.MemoryPoolHttpResponseStreamWriterFactory">
+      <method name=".ctor" />
+    </type>
+    <type fullname="Microsoft.AspNetCore.Mvc.Infrastructure.DefaultProblemDetailsFactory">
       <method name=".ctor" />
     </type>
   </assembly>
