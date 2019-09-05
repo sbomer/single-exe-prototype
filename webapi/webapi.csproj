@@ -113,6 +113,14 @@
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk.Web" />
 
   <!-- These targets will use the local crossgen, which doesn't take /JITPath -->
+  <Target Name="UseLocalCrossgen"
+          AfterTargets="_PrepareForReadyToRunCompilation">
+    <ItemGroup>
+      <_CrossgenTool Remove="@(_CrossgenTool)" />
+      <_CrossgenTool Include="$(CoreClrDir)crossgen" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="_CreateR2RImages">
     <!-- Work around non-assemblies in the input that are normally filtered out by the ReadyToRun task -->
     <ItemGroup>
