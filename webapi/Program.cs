@@ -12,9 +12,9 @@ namespace webapi
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
-            using (var host = CreateHostBuilder(args).Build().Run())
+            using (var host = CreateHostBuilder(args).Start())
             {
                 var client = new HttpClient();
                 var response = await client.GetAsync("http://localhost:5000/WeatherForecast");
