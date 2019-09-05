@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +14,12 @@ namespace webapi
     {
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            using (var host = CreateHostBuilder(args).Build().Run())
+            {
+                var client = new HttpClient();
+                var response = await client.GetAsync("http://localhost:5000/WeatherForecast");
+                response.EnsureSuccessStatusCode();
+            }
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
