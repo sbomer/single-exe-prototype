@@ -1,10 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk.Web" />
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
     <SelfContained>true</SelfContained>
     <PublishTrimmed>true</PublishTrimmed>
-    <PublishDir Condition=" '$(PublishTrimmed)' == 'true' ">obj/trim</PublishDir>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishDir>$(MSBuildThisFileDirectory)../publish</PublishDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UseStaticHost>true</UseStaticHost>
+    <CoreClrDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../coreclr/bin/Product/Linux.x64.Release/'))</CoreClrDir>
   </PropertyGroup>
 
   <!-- detect current platform RID -->
@@ -18,8 +26,7 @@
     <TrimmerRootDescriptor Include="trim.xml" />
   </ItemGroup>
 
-  <!-- enable aggressive trimming. -->
-  <Target Name="SetAggresiveILLinkDefaults"
+  <Target Name="EnableAggressiveTrimming"
           AfterTargets="_SetILLinkDefaults">
     <ItemGroup>
       <TrimmerRootAssembly Remove="@(TrimmerRootAssembly)" />
@@ -28,13 +35,7 @@
         <action>link</action>
       </_ManagedAssembliesToLink>
     </ItemGroup>
-
-    <!-- if NoTrim is true, pass through cecil to remove R2R, but don't trim. -->
-    <ItemGroup Condition="'$(NoTrim)' == 'true'">
-      <TrimmerRootAssembly Include="@(_ManagedAssembliesToLink)" />
-    </ItemGroup>
   </Target>
-
 
   <Target Name="RemoveUnnecessaryFilesFromPublishOutput"
           AfterTargets="ComputeResolvedFilesToPublishList">
@@ -70,10 +71,35 @@
 
     <Message Importance="High" Text="not publishing: %(PublishFilterList.Identity)" />
 
+    <ItemGroup Condition=" '$(UseStaticHost)' == 'true' ">
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libcoreclr'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libclrjit'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libhostpolicy'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libhostfxr'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Native'" />
+
+      <!-- These used to be filtered out. Do they need to be in the bundle? -->
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.IO.Compression.Native'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Net.Security.Native'" />
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Security.Cryptography.Native.OpenSsl'" />
+
+      <!-- apphost -->
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)%(Extension)' == '$(AssemblyName)'" />
+      <!-- corelib -->
+      <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Private.CoreLib'" />
+
+      <StaticHostLibs Include="$(CoreClrDir)corebundle">
+        <RelativePath>$(AssemblyName)</RelativePath>
+      </StaticHostLibs>
+      <StaticHostLibs Include="$(CoreClrDir)System.Private.CoreLib.dll">
+        <RelativePath>System.Private.CoreLib.dll</RelativePath>
+      </StaticHostLibs>
+    </ItemGroup>
+
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(PublishFilterList)" />
-      <!-- these should be removed from deps file. -->
-      <!-- to accomplish that, remove them from runtimecopylocalitems, etc. as well. -->
+      <ResolvedFileToPublish Include="@(StaticHostLibs)" />
+
       <ResolvedCompileFileDefinitions Remove="@(PublishFilterList)" />
       <NativeCopyLocalItems Remove="@(PublishFilterList)" />
       <ResourceCopyLocalItems Remove="@(PublishFilterList)" />
@@ -81,6 +107,26 @@
       <RuntimeTargetsCopyLocalItems Remove="@(PublishFilterList)" />
       <RuntimePackAsset Remove="@(PublishFilterList)" />
     </ItemGroup>
+  </Target>
+
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk.Web" />
+
+  <!-- These targets will use the local crossgen, which doesn't take /JITPath -->
+  <Target Name="_CreateR2RImages">
+    <!-- Work around non-assemblies in the input that are normally filtered out by the ReadyToRun task -->
+    <ItemGroup>
+      <_ReadyToRunImplementationAssemblies Remove="@(_ReadyToRunImplementationAssemblies)" Condition=" '%(Extension)' != '.dll' " />
+    </ItemGroup>
+    <PropertyGroup>
+      <CrossgenCommand>@(_CrossgenTool) /nologo /MissingDependenciesOK</CrossgenCommand>
+      <!-- crossgen fails if System.Private.CoreLib isn't a fully-qualified path -->
+      <CrossgenCommand>$(CrossgenCommand) /r @(_ReadyToRunImplementationAssemblies->'%(FullPath)', ' /r ')</CrossgenCommand>
+    </PropertyGroup>
+    <ItemGroup>
+      <CrossgenCommands Include="$(CrossgenCommand) /out %(_ReadyToRunCompileList.OutputR2RImage) %(_ReadyToRunCompileList.Identity)" />
+    </ItemGroup>
+    <Exec Command="%(CrossgenCommands.Identity)" />
   </Target>
 
 </Project>
