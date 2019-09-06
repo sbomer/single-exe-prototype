@@ -1,3 +1,3 @@
 [submodule "coreclr"]
 	path = coreclr
-	url = https://github.com/swaroop-sridhar/coreclr
+	url = https://github.com/dotnet/coreclr
