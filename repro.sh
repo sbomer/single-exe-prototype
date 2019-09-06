@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 # apt install cmake clang llvm libicu-dev liblttng-ust-dev libkrb5-dev
-#
+
+# initialize submodule
+git submodule update --init
+
 # pushd coreclr
 # export LANG=en_US.UTF-8
 # ./build.sh -stripsymbols
