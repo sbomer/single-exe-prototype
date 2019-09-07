@@ -1,19 +1,24 @@
 <Project>
 
-  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk.Web" />
-
   <PropertyGroup>
+    <UseStaticHost Condition=" '$(UseStaticHost)' == '' ">true</UseStaticHost>
+    <UsePublishFilterList Condition=" '$(UsePublishFilterList)' == '' ">true</UsePublishFilterList>
+    <PublishTrimmed Condition=" '$(PublishTrimmed)' == '' ">false</PublishTrimmed>
+    <PublishReadyToRun Condition=" '$(PublishReadyToRun)' == '' ">false</PublishReadyToRun>
     <TargetFramework>netcoreapp3.0</TargetFramework>
     <SelfContained>true</SelfContained>
-    <PublishTrimmed>true</PublishTrimmed>
-    <PublishReadyToRun>true</PublishReadyToRun>
-    <PublishDir>$(MSBuildThisFileDirectory)../publish</PublishDir>
+    <CoreClrBinariesDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)coreclrbin/'))</CoreClrBinariesDir>
   </PropertyGroup>
 
   <PropertyGroup>
-    <UseStaticHost>true</UseStaticHost>
-    <CoreClrDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../coreclr/bin/Product/Linux.x64.Release/'))</CoreClrDir>
+    <!-- output intermediate files into the publish directory as well
+         for easy retrieval from aspnet benchmark infra -->
+    <!-- be careful not to measure size numbers from this directory. -->
+    <BaseIntermediateOutputPath>$(PublishDir)/obj</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(PublishDir)/bin</BaseOutputPath>
   </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk.Web" />
 
   <!-- detect current platform RID -->
   <PropertyGroup Condition=" '$(SelfContained)' == 'true' ">
@@ -21,6 +26,35 @@
     <RuntimeIdentifier Condition="'$([MSBuild]::IsOSPlatform(Linux))' == 'true'">linux-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$([MSBuild]::IsOSPlatform(OSX))' == 'true'">osx-x64</RuntimeIdentifier>
   </PropertyGroup>
+
+  <Target Name="PublishToIntermediateDirectory"
+          BeforeTargets="PrepareForPublish"
+          Condition=" '$(UseStaticHost)' == 'true' ">
+    <PropertyGroup>
+      <PublishDir>$(MultiFilePublishDir)</PublishDir>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="UseStaticHost"
+          AfterTargets="Publish"
+          Condition=" '$(UseStaticHost)' == 'true' ">
+    <MakeDir Directories="$(SingleFilePublishDir)" />
+    <PropertyGroup>
+      <BundleCommand>dotnet $(CoreClrBinariesDir)bundle.dll</BundleCommand>
+      <BundleCommand>$(BundleCommand) --source $([System.IO.Path]::GetFullPath('$(MultiFilePublishDir)'))</BundleCommand>
+      <BundleCommand>$(BundleCommand) --host $(AssemblyName)</BundleCommand>
+    </PropertyGroup>
+    <Message Importance="High" Text="$(BundleCommand)" />
+    <!-- run from single-file publish directory to ensure output is placed there -->
+    <Exec Command="$(BundleCommand)"
+          WorkingDirectory="$(SingleFilePublishDir)" />
+    <PropertyGroup>
+      <SingleFileExecutable>$(SingleFilePublishDir)$(AssemblyName)</SingleFileExecutable>
+    </PropertyGroup>
+    <Exec Command="chmod 755 $(SingleFileExecutable)" />
+    <Error Condition=" ! Exists('$(SingleFileExecutable)') " Text="single file not found at $(SingleFileExecutable)" />
+    <Message Importance="High" Text="generated $(SingleFileExecutable)" />
+  </Target>
 
   <ItemGroup>
     <TrimmerRootDescriptor Include="trim.xml" />
@@ -37,9 +71,19 @@
     </ItemGroup>
   </Target>
 
+
+  <Target Name="_DontUseBuildDependencyFile"
+          AfterTargets="_ComputeUseBuildDependencyFile"
+          Condition=" '$(UsePublishFilterList)' == 'true' ">
+    <PropertyGroup>
+      <!-- this allows us to remove files from deps.json, even if we didn't link. -->
+      <_UseBuildDependencyFile>false</_UseBuildDependencyFile>
+    </PropertyGroup>
+  </Target>
+
   <Target Name="RemoveUnnecessaryFilesFromPublishOutput"
           AfterTargets="ComputeResolvedFilesToPublishList">
-    <ItemGroup>
+    <ItemGroup Condition=" '$(UsePublishFilterList)' == 'true' ">
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordaccore'" />
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libmscordbi'" />
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'libdbgshim'" />
@@ -88,17 +132,17 @@
       <!-- corelib -->
       <PublishFilterList Include="%(ResolvedFileToPublish.Identity)" Condition="'%(FileName)' == 'System.Private.CoreLib'" />
 
-      <StaticHostLibs Include="$(CoreClrDir)corebundle">
+      <StaticHostLibs Include="$(CoreClrBinariesDir)corebundle">
         <RelativePath>$(AssemblyName)</RelativePath>
       </StaticHostLibs>
-      <StaticHostLibs Include="$(CoreClrDir)System.Private.CoreLib.dll">
+      <StaticHostLibs Include="$(CoreClrBinariesDir)System.Private.CoreLib.dll">
         <RelativePath>System.Private.CoreLib.dll</RelativePath>
       </StaticHostLibs>
     </ItemGroup>
 
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(PublishFilterList)" />
-      <ResolvedFileToPublish Include="@(StaticHostLibs)" />
+      <ResolvedFileToPublish Include="@(StaticHostLibs)" Condition=" '$(UseStaticHost)' == 'true' " />
 
       <ResolvedCompileFileDefinitions Remove="@(PublishFilterList)" />
       <NativeCopyLocalItems Remove="@(PublishFilterList)" />
@@ -112,12 +156,21 @@
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk.Web" />
 
+  <!-- set after the SDK targets define IntermediateOutputPath and PublishDir -->
+  <PropertyGroup Condition=" '$(UseStaticHost)' == 'true' ">
+    <!-- directory used by the aspnet benchmarking infra -->
+    <SingleFilePublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))</SingleFilePublishDir>
+    <!-- directory used by the Publish target. we create the bundle after publishing. -->
+    <MultiFilePublishDir>$(PublishDir)/multifile-publish</MultiFilePublishDir>
+  </PropertyGroup>
+
+
   <!-- These targets will use the local crossgen, which doesn't take /JITPath -->
   <Target Name="UseLocalCrossgen"
           AfterTargets="_PrepareForReadyToRunCompilation">
     <ItemGroup>
       <_CrossgenTool Remove="@(_CrossgenTool)" />
-      <_CrossgenTool Include="$(CoreClrDir)crossgen" />
+      <_CrossgenTool Include="$(CoreClrBinariesDir)crossgen" />
     </ItemGroup>
   </Target>
 
@@ -126,6 +179,8 @@
     <ItemGroup>
       <_ReadyToRunImplementationAssemblies Remove="@(_ReadyToRunImplementationAssemblies)" Condition=" '%(Extension)' != '.dll' " />
     </ItemGroup>
+    <!-- Necessary when sending to perflab - the permissions are not preserved when zipping/unzipping. -->
+    <Exec Command="chmod +x @(_CrossgenTool)" />
     <PropertyGroup>
       <CrossgenCommand>@(_CrossgenTool) /nologo /MissingDependenciesOK</CrossgenCommand>
       <!-- crossgen fails if System.Private.CoreLib isn't a fully-qualified path -->
